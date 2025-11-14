@@ -43,6 +43,8 @@
       let boat;
       let isBoatMoving = false;
 
+      const particles = [];
+
       async function loadTree() {
         const loader = new OBJLoader();
         const object = await loader.loadAsync("fa.obj");
@@ -405,47 +407,78 @@
       let boatProgress = 0;
 
       function animate(frameTime) {
-        const deltaSeconds = (frameTime - prevTime)/1000;
+        const deltaSeconds = (frameTime - prevTime) / 1000;
         prevTime = frameTime;
 
         requestAnimationFrame(animate);
         controls.update();
 
+        particles.forEach((particle) => {
+          if (particle.isDead) {
+              scene.remove(particle.points);
+              particle.dispose();
+          }
+
+          particle.update();
+        });
+
         if (isBoatMoving) {
-            console.log(boatProgress)
+          console.log(boatProgress);
 
           boatProgress += deltaSeconds;
 
           if (boatProgress < 38) {
-              boat.translateX(14.28 * deltaSeconds)
+            boat.translateX(14.28 * deltaSeconds);
           }
 
           if (boatProgress > 9 && boatProgress < 10) {
-              boat.rotateY(-0.714*deltaSeconds)
+            boat.rotateY(-0.714 * deltaSeconds);
           }
 
           if (boatProgress > 12.5 && boatProgress < 13.5) {
-              boat.rotateY(-0.357*deltaSeconds)
+            boat.rotateY(-0.357 * deltaSeconds);
           }
 
-          if (boatProgress > 21 && boatProgress < 22.5){
-              boat.rotateY(0.357*deltaSeconds);
+          if (boatProgress > 21 && boatProgress < 22.5) {
+            boat.rotateY(0.357 * deltaSeconds);
           }
 
-            if (boatProgress > 27 && boatProgress < 27.5){
-                boat.rotateY(0.357*deltaSeconds);
-            }
+          if (boatProgress > 27 && boatProgress < 27.5) {
+            boat.rotateY(0.357 * deltaSeconds);
+          }
 
-            if (boatProgress > 33 && boatProgress < 33.5){
-                boat.rotateY(0.357*deltaSeconds);
-            }
+          if (boatProgress > 33 && boatProgress < 33.5) {
+            boat.rotateY(0.357 * deltaSeconds);
+          }
 
-            if (boatProgress > 38){
-                isBoatMoving = false;
-                boat.rotation.y = (Math.PI / 16) * 7;
-                boat.position.set(-160, 16, 150);
-                boatProgress = 0;
-            }
+          if (boatProgress > 38) {
+            const endTeleportParticles = new TeleportParticles(
+              boat.position.x,
+              boat.position.y,
+              boat.position.z,
+              5,
+              10,
+              200
+            );
+            scene.add(endTeleportParticles.points);
+            particles.push(endTeleportParticles);
+
+            isBoatMoving = false;
+            boat.rotation.y = (Math.PI / 16) * 7;
+            boat.position.set(-160, 16, 150);
+            boatProgress = 0;
+
+            const startTeleportParticles = new TeleportParticles(
+              boat.position.x,
+              boat.position.y,
+              boat.position.z,
+              5,
+              10,
+              200
+            );
+            scene.add(startTeleportParticles.points);
+            particles.push(startTeleportParticles);
+          }
         }
 
         render();
@@ -453,6 +486,76 @@
 
       function render() {
         renderer.render(scene, camera);
+      }
+
+      class TeleportParticles {
+        constructor(x, y, z, lifetime, spread, count) {
+          this.x = x;
+          this.y = y;
+          this.z = z;
+          this.lifetime = lifetime;
+
+          this.dead = false;
+
+          const particleCount = count;
+          this.geometry = new THREE.BufferGeometry();
+          const positions = [];
+
+          for (let i = 0; i < particleCount; i++) {
+            positions.push(
+              (Math.random() - 0.5) * spread,
+              (Math.random() - 0.5) * spread,
+              (Math.random() - 0.5) * spread
+            );
+          }
+
+          this.geometry.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(positions, 3)
+          );
+
+          this.material = new THREE.PointsMaterial({
+            color: 0x7526a0,
+            size: 1,
+            transparent: true,
+            opacity: 0.8,
+          });
+
+          this.particles = new THREE.Points(this.geometry, this.material);
+          this.particles.position.set(x, y, z);
+        }
+
+        get points() {
+          return this.particles;
+        }
+
+        get isDead() {
+          return this.dead;
+        }
+
+        dispose() {
+          this.geometry.dispose();
+          this.material.dispose();
+        }
+
+        update() {
+          if (this.material.opacity <= 0) {
+            this.dead = true;
+            return;
+          }
+
+          const pos = this.geometry.attributes.position;
+          for (let i = 0; i < pos.count; i++) {
+            pos.setXYZ(
+              i,
+              pos.getX(i) + (Math.random() - 0.5) * 0.1,
+              pos.getY(i) + (Math.random() - 0.5) * 0.1,
+              pos.getZ(i) + (Math.random() - 0.5) * 0.1
+            );
+          }
+          pos.needsUpdate = true;
+          this.material.opacity -= 0.01 / this.lifetime;
+        }
       }
     </script>
   </body>
