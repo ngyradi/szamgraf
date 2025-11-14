@@ -37,11 +37,12 @@
       let scene, camera;
       let geometry, material, mesh;
       let controls;
-      let ambientLight, pointLight, directionalLight;
       let prevTime = 0;
 
       let boat;
       let isBoatMoving = false;
+
+      let sunPivot;
 
       const particles = [];
 
@@ -55,6 +56,8 @@
               color: 0x6b1717,
               side: THREE.DoubleSide,
             });
+            child.castShadow = true;
+            child.receiveShadow = true;
           }
         });
 
@@ -79,7 +82,7 @@
         document.body.appendChild(renderer.domElement);
 
         scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0xcccccc, 0.005);
+        scene.fog = new THREE.FogExp2(0xcccccc, 0.0025);
 
         camera = new THREE.PerspectiveCamera(75, aspectRatio, 0.1, 1000);
         camera.position.z = 100;
@@ -90,55 +93,33 @@
         createTrees();
 
         // bridge over the water imn the middle
-        // boat going through the river
-        // sun and moon automatically moving, lighting changing
 
-        ambientLight = new THREE.AmbientLight(0xffffff, 1);
-        // ambientLight = new THREE.AmbientLight(0xecf300, 1);
+        const ambient = new THREE.AmbientLight(0x404040, 5);
+        scene.add(ambient);
 
-        scene.add(ambientLight);
-        // spotLight = new THREE.SpotLight(0xffffff, 50000);
-        // spotLight.position.set(-40, 50, 20);
-        // spotLight.angle = Math.PI / 8;
-        // spotLight.target = treeTrunkMesh;
-        // spotLight.penumbra = 0.8;
-        // spotLight.distance = 5000;
-        // spotLight.castShadow = true;
+        sunPivot = new THREE.Object3D();
+        scene.add(sunPivot);
 
-        // const arrowHelper = new THREE.ArrowHelper(
-        //   spotLight.position.clone().normalize(),
-        //   new THREE.Vector3(0, 0, 0),
-        //   25,
-        //   0x00ff00
-        // );
-        // scene.add(spotLight);
-        // scene.add(arrowHelper);
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.0); // bright white
+        sunLight.position.set(50, 100, 50); // position high above
+        sunLight.castShadow = true; // enable shadows
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 500;
+          sunLight.shadow.camera.left = -250;
+          sunLight.shadow.camera.right = 250;
+          sunLight.shadow.camera.top = 250;
+          sunLight.shadow.camera.bottom = -250;
 
-        // pointLight = new THREE.PointLight(0xff0000, 2000, 100);
-        // pointLight.position.set(15, 10, -10);
+          sunLight.position.set(0,200,-50);
 
-        // pointLight.castShadow = true;
-        // scene.add(pointLight);
+          sunPivot.add(sunLight);
+          scene.add(sunLight.target);
 
-        // const pointHelper = new THREE.Mesh(
-        //   new THREE.SphereGeometry(1),
-        //   new THREE.MeshBasicMaterial({ color: 0xff0000 })
-        // );
-        // pointHelper.position.copy(pointLight.position);
-        // scene.add(pointHelper);
-
-        // const directionalLight = new THREE.DirectionalLight(0x0000ff, 10);
-        // directionalLight.position.set(-50, 10, 5);
-        // directionalLight.castShadow = true;
-        // scene.add(directionalLight);
-
-        // const dirHelper = new THREE.ArrowHelper(
-        //   directionalLight.position.clone().normalize(),
-        //   new THREE.Vector3(0, 0, 0),
-        //   50,
-        //   0x00ff00
-        // );
-        // scene.add(dirHelper);
+        // Optional: add a helper to visualize
+        const sunHelper = new THREE.DirectionalLightHelper(sunLight, 5);
+        scene.add(sunHelper);
 
         boat = createBoat();
         scene.add(boat);
@@ -173,6 +154,7 @@
         const planeMesh = new THREE.Mesh(planeGeometry, groundMaterial);
 
         planeMesh.receiveShadow = true;
+        planeMesh.castShadow = true;
 
         planeMesh.position.set(0, -5, 0);
         planeMesh.scale.set(50, 50, 50);
@@ -407,7 +389,9 @@
       let boatProgress = 0;
 
       function animate(frameTime) {
-        const deltaSeconds = (frameTime - prevTime) / 1000;
+
+          sunPivot.rotation.z -= 0.003;
+          const deltaSeconds = (frameTime - prevTime) / 1000;
         prevTime = frameTime;
 
         requestAnimationFrame(animate);
@@ -415,8 +399,8 @@
 
         particles.forEach((particle) => {
           if (particle.isDead) {
-              scene.remove(particle.points);
-              particle.dispose();
+            scene.remove(particle.points);
+            particle.dispose();
           }
 
           particle.update();
