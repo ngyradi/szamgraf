@@ -91,6 +91,8 @@
     let gooMaterial;
     let cauldronLight;
 
+    let waterMaterial;
+
     const particles = [];
     const keys = {};
 
@@ -267,8 +269,8 @@
             map: grassTexture
         });
 
-        const waterMaterial = new THREE.MeshStandardMaterial({
-            color: 0x0000cc,
+        waterMaterial = new THREE.MeshStandardMaterial({
+            color: 0xaa00cc,
             map: riverTexture,
             displacementMap: riverBump,
             displacementScale: 0.02,
@@ -763,6 +765,8 @@
 
         gooMaterial.map.offset.y += 0.05;
         gooMaterial.map.offset.x += 0.025;
+
+        waterMaterial.map.offset.y += -0.00025;
 
         particles.forEach((particle) => {
             if (particle.isDead) {
