@@ -40,11 +40,38 @@
       let prevTime = 0;
 
       let boat;
+      let boatPointLight;
       let isBoatMoving = false;
 
       let sunPivot;
 
       const particles = [];
+
+      const manager = new THREE.LoadingManager();
+
+      manager.onLoad = function () {
+          init();
+          animate();
+      };
+
+      const textureLoader = new THREE.TextureLoader(manager);
+      const grassTexture = textureLoader.load('grass.png');
+      grassTexture.wrapS = THREE.RepeatWrapping;
+      grassTexture.wrapT = THREE.RepeatWrapping;
+      grassTexture.repeat.set(8,8);
+
+      const treeTexture = textureLoader.load('tree.png');
+      treeTexture.wrapS = THREE.RepeatWrapping;
+      treeTexture.wrapT = THREE.RepeatWrapping;
+      treeTexture.repeat.set(3,3);
+
+      const riverTexture = textureLoader.load('river.png');
+      riverTexture.wrapS = THREE.RepeatWrapping;
+      riverTexture.wrapT = THREE.RepeatWrapping;
+      riverTexture.repeat.set(2,2);
+
+      const riverDisplacementMap = textureLoader.load('river_displacement.png');
+      const riverBump = textureLoader.load('river_bump.png');
 
       async function loadTree() {
         const loader = new OBJLoader();
@@ -55,6 +82,7 @@
             child.material = new THREE.MeshLambertMaterial({
               color: 0x6b1717,
               side: THREE.DoubleSide,
+                map: treeTexture
             });
             child.castShadow = true;
             child.receiveShadow = true;
@@ -63,9 +91,6 @@
 
         return object;
       }
-
-      init();
-      animate();
 
       async function init() {
         HEIGHT = window.innerHeight;
@@ -107,10 +132,10 @@
         sunLight.shadow.mapSize.height = 2048;
         sunLight.shadow.camera.near = 0.5;
         sunLight.shadow.camera.far = 500;
-          sunLight.shadow.camera.left = -250;
-          sunLight.shadow.camera.right = 250;
-          sunLight.shadow.camera.top = 250;
-          sunLight.shadow.camera.bottom = -250;
+          sunLight.shadow.camera.left = -300;
+          sunLight.shadow.camera.right = 300;
+          sunLight.shadow.camera.top = 300;
+          sunLight.shadow.camera.bottom = -300;
 
           sunLight.position.set(0,200,-50);
 
@@ -127,7 +152,7 @@
         boat.scale.set(2, 2, 2);
 
         boat.rotation.y = (Math.PI / 16) * 7;
-        boat.position.set(-160, 16, 150);
+        boat.position.set(-160, 17, 150);
 
         controls = new TrackballControls(camera, renderer.domElement);
 
@@ -138,16 +163,16 @@
       function createTerrain() {
         const groundMaterial = new THREE.MeshStandardMaterial({
           color: 0x38a800,
-          displacementMap: new THREE.TextureLoader().load(
-            "river_displacement.png"
-          ),
+          displacementMap: riverDisplacementMap,
           displacementScale: 0.5,
+            map: grassTexture
         });
 
-        const waterMaterial = new THREE.MeshPhongMaterial({
+        const waterMaterial = new THREE.MeshStandardMaterial({
           color: 0x0000cc,
-          specular: 0xffffff,
-          shininess: 10,
+            map: riverTexture,
+            displacementMap: riverBump,
+            displacementScale: 0.02,
         });
 
         const planeGeometry = new THREE.PlaneGeometry(10, 10, 256, 256);
@@ -320,6 +345,9 @@
         );
         mast.position.set(0, 1.9, 0);
 
+        boatPointLight = new THREE.PointLight(0xffffcc,30,30,1);
+        boatPointLight.position.set(0, 3.8, 0);
+
         const sail = new THREE.Mesh(
           new THREE.PlaneGeometry(2, 2),
           new THREE.MeshStandardMaterial({
@@ -345,6 +373,7 @@
         boat.add(plank2);
         boat.add(plank3);
         boat.add(plank4);
+        boat.add(boatPointLight);
 
         boat.traverse((child) => {
           if (child.isMesh) {
@@ -449,7 +478,7 @@
 
             isBoatMoving = false;
             boat.rotation.y = (Math.PI / 16) * 7;
-            boat.position.set(-160, 16, 150);
+            boat.position.set(-160, 17, 150);
             boatProgress = 0;
 
             const startTeleportParticles = new TeleportParticles(
