@@ -88,13 +88,16 @@
     let windmillTopPart;
     let windmillLight;
 
+    let gooMaterial;
+    let cauldronLight;
+
     const particles = [];
     const keys = {};
 
     const manager = new THREE.LoadingManager();
 
-    manager.onLoad = function () {
-        init();
+    manager.onLoad = async function () {
+        await init();
         animate();
     };
 
@@ -117,6 +120,11 @@
     const riverDisplacementMap = textureLoader.load('river_displacement.png');
     const riverBump = textureLoader.load('river_bump.png');
 
+    const gooTexture = textureLoader.load('goo.png');
+    gooTexture.wrapS = THREE.RepeatWrapping;
+    gooTexture.wrapT = THREE.RepeatWrapping;
+    gooTexture.repeat.set(2, 2);
+
     async function loadTree() {
         const loader = new OBJLoader();
         const object = await loader.loadAsync("fa.obj");
@@ -132,6 +140,25 @@
                 child.receiveShadow = true;
             }
         });
+
+        return object;
+    }
+
+    async function loadCauldron(){
+        const loader = new OBJLoader();
+        const object = await loader.loadAsync("cauldron.obj");
+
+        object.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+                child.material = new THREE.MeshStandardMaterial({
+                    color: 0x6B6B6B,
+                    side: THREE.DoubleSide,
+                })
+
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        })
 
         return object;
     }
@@ -207,6 +234,12 @@
 
         windmill.group.position.set(-80, 30, -80);
         windmill.group.rotation.y = -Math.PI / 6;
+
+        const campfire = await createCampfire();
+        campfire.rotation.x = Math.PI / 2;
+
+        campfire.position.set(0,20,0)
+        scene.add(campfire);
 
         controls = new TrackballControls(camera, renderer.domElement);
         controls.rotateSpeed = 2.0;
@@ -317,6 +350,64 @@
 
             scene.add(clone);
         }
+    }
+
+    async function createCampfire(){
+        const plankMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8b4513,
+        });
+
+        const plankGeometry = new THREE.BoxGeometry(10,1,2);
+
+        const planks = new THREE.Group();
+
+        const plankCount = 12;
+        for (let i = 0; i < plankCount; i++) {
+            const plank = new THREE.Mesh(plankGeometry, plankMaterial);
+            plank.castShadow = true;
+            plank.receiveShadow = true;
+
+            plank.rotation.z = (i * Math.PI * 2) / plankCount;
+            planks.add(plank)
+        }
+
+        const cauldron = await loadCauldron();
+
+        cauldron.rotation.x = -Math.PI / 2;
+        cauldron.position.set(0, 0, -3.6);
+
+        cauldron.scale.set(2.5, 2.5, 2.5);
+
+        const steam = new SteamParticles(0,6,0,10);
+        steam.particles.rotation.x = -Math.PI / 2;
+
+        planks.add(cauldron)
+        planks.add(steam.particles);
+        particles.push(steam);
+
+        gooMaterial = new THREE.MeshStandardMaterial({
+            color: 0x00cc00,
+            map: gooTexture
+        })
+        const goo = new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6,4,4),gooMaterial);
+        cauldron.add(goo)
+        goo.rotation.x = -Math.PI / 2;
+        goo.position.set(0, 0.7, 0)
+
+        cauldronLight = new THREE.PointLight(0xFF6A00, 1000, 25, 1);
+        cauldronLight.position.set(0, 0, -1.1);
+        cauldronLight.castShadow = true;
+
+        planks.add(cauldronLight);
+
+        planks.traverse((child)=>{
+            if (child.isMesh){
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        })
+
+        return planks;
     }
 
     function createWindmill() {
@@ -660,6 +751,8 @@
             windmillTopPart.rotation.y += 0.003 * Math.sin(frameTime / 1000);
 
             windmillLight.intensity = 200 + Math.sin(frameTime / 500)*200;
+
+            cauldronLight.intensity = 1000+ Math.sin(frameTime / 100)*700;
         }
 
 
@@ -667,6 +760,9 @@
 
         updateCameraMovement();
         controls.update();
+
+        gooMaterial.map.offset.y += 0.05;
+        gooMaterial.map.offset.x += 0.025;
 
         particles.forEach((particle) => {
             if (particle.isDead) {
@@ -810,6 +906,89 @@
             this.material.opacity -= 0.01 / this.lifetime;
         }
     }
+
+    class SteamParticles {
+        constructor(x, y, z, maxCount = 200) {
+            this.origin = new THREE.Vector3(x, y, z);
+            this.maxCount = maxCount;
+
+            this.geometry = new THREE.BufferGeometry();
+            this.positions = new Float32Array(maxCount * 3);
+            this.lifetimes = new Float32Array(maxCount);
+            this.ages = new Float32Array(maxCount);
+
+            this.geometry.setAttribute("position", new THREE.BufferAttribute(this.positions, 3));
+
+            this.material = new THREE.PointsMaterial({
+                size: 0.5,
+                transparent: true,
+                opacity: 0.5,
+                vertexColors: true,
+            });
+
+            this.colors = new Float32Array(maxCount * 3);
+            this.geometry.setAttribute("color", new THREE.BufferAttribute(this.colors, 3));
+
+            this.particles = new THREE.Points(this.geometry, this.material);
+
+            for (let i = 0; i < maxCount; i++) {
+                this.resetParticle(i, true);
+            }
+        }
+
+        resetParticle(i, initial = false) {
+            this.positions[i * 3] = this.origin.x;
+            this.positions[i * 3 + 1] = this.origin.y;
+            this.positions[i * 3 + 2] = this.origin.z;
+
+            this.ages[i] = 0;
+            this.lifetimes[i] = 60 + Math.random() * 30;
+
+            this.colors[i * 3] = 1.0;
+            this.colors[i * 3 + 1] = 1.0;
+            this.colors[i * 3 + 2] = 1.0;
+
+            if (!initial) {
+                this.geometry.attributes.position.needsUpdate = true;
+                this.geometry.attributes.color.needsUpdate = true;
+            }
+        }
+
+        update() {
+            const pos = this.geometry.attributes.position;
+            const col = this.geometry.attributes.color;
+
+            for (let i = 0; i < this.maxCount; i++) {
+                this.ages[i]++;
+
+                if (this.ages[i] >= this.lifetimes[i]) {
+                    this.resetParticle(i);
+                    continue;
+                }
+
+                this.positions[i * 3 + 1] += 0.1;
+
+                this.positions[i * 3] += (Math.random() - 0.5) * 0.2;
+                this.positions[i * 3 + 2] += (Math.random() - 0.5) * 0.2;
+
+                const lifeRatio = this.ages[i] / this.lifetimes[i];
+                const fade = 1.0 - lifeRatio;
+                col.array[i * 3] = fade;
+                col.array[i * 3 + 1] = fade;
+                col.array[i * 3 + 2] = fade;
+
+                this.material.size = 0.5 + lifeRatio * 1.5;
+            }
+
+            pos.needsUpdate = true;
+            col.needsUpdate = true;
+        }
+
+        get points() {
+            return this.particles;
+        }
+    }
+
 </script>
 </body>
 </html>
