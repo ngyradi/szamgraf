@@ -1,0 +1,7 @@
+a fa egy cube hálóból indult
+
+loop cut a közepén -> 2 félre
+az élek mozgatása -> alul szélesebb a törzse
+
+ezután a tetején lévő 2 lapra -> extrude, aztán kisebbre skálázás
+az ágakat ugyanígy alakítottam
